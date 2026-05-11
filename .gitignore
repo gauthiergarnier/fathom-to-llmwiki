@@ -1,5 +1,7 @@
 .env
 .fathom-export-state.json
+profiles/*.toml
+!profiles/*.example.toml
 __pycache__/
 *.pyc
 *.egg-info/

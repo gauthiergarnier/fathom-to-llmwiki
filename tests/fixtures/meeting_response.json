@@ -1,0 +1,55 @@
+{
+  "recording_id": 98765,
+  "title": "Q2 Strategy Review",
+  "url": "https://fathom.video/calls/98765",
+  "share_url": "https://fathom.video/share/abc123",
+  "created_at": "2026-05-10T14:00:00Z",
+  "recording_start_time": "2026-05-10T14:02:30Z",
+  "recording_end_time": "2026-05-10T14:47:15Z",
+  "transcript_language": "en",
+  "recorded_by": {
+    "name": "Jane Smith",
+    "email": "gauthier@example.com",
+    "domain": "example.com",
+    "team": "Alliances"
+  },
+  "calendar_invitees": [
+    {"name": "Alice Martin", "email": "alice@example.com", "is_external": false},
+    {"name": "Bob Chen", "email": "bob@partner.com", "is_external": true}
+  ],
+  "default_summary": {
+    "template_name": "default",
+    "markdown_formatted": "The team reviewed the Q2 alliance strategy, focusing on platform migration targets and partner enablement timelines. Key decisions included prioritizing the Acme CRM integration and deferring the Globex proposal to Q3."
+  },
+  "action_items": [
+    {
+      "description": "Send updated Acme CRM integration timeline",
+      "user_generated": false,
+      "completed": false,
+      "assignee": {"name": "Alice Martin", "email": "alice@example.com"}
+    },
+    {
+      "description": "Draft Globex Q3 proposal outline",
+      "user_generated": false,
+      "completed": false,
+      "assignee": {"name": "Bob Chen", "email": "bob@partner.com"}
+    }
+  ],
+  "transcript": [
+    {
+      "speaker": {"display_name": "Jane Smith", "matched_calendar_invitee_email": "gauthier@example.com"},
+      "text": "Let's start with the Q2 targets. Alice, can you walk us through the Acme CRM status?",
+      "timestamp": "00:00:15"
+    },
+    {
+      "speaker": {"display_name": "Alice Martin", "matched_calendar_invitee_email": "alice@example.com"},
+      "text": "Sure. We're at 60% completion on the integration. The main blocker is the API versioning issue I flagged last week.",
+      "timestamp": "00:00:32"
+    },
+    {
+      "speaker": {"display_name": "Bob Chen", "matched_calendar_invitee_email": "bob@partner.com"},
+      "text": "I can help with that. We had a similar issue on the Globex side and found a workaround too.",
+      "timestamp": "00:01:05"
+    }
+  ]
+}

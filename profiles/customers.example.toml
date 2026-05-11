@@ -1,0 +1,19 @@
+# Customers & Partners profile — export meetings where at least
+# one participant is from a customer or partner domain.
+
+[participants]
+include = [
+    "*@customer-one.com",
+    "*@customer-two.com",
+    "*@partner-corp.io",
+    "jane.doe@external.com",
+]
+
+# Optional: skip automated invites
+# exclude = [
+#     "noreply@customer-one.com",
+# ]
+
+# Optional: also apply title filters
+# [title]
+# exclude = ["Internal", "1:1"]

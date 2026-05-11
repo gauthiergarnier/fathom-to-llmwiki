@@ -1,0 +1,11 @@
+.env
+.fathom-export-state.json
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+.pytest_cache/
+.venv/
+.claude/

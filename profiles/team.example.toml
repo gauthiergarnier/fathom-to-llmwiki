@@ -1,0 +1,18 @@
+# Team profile — export meetings where at least one participant
+# is from your company. Update the domains/emails as needed.
+
+[participants]
+include = [
+    "*@yourcompany.com",
+    "*@yourcompany.io",
+]
+
+# Optional: exclude specific addresses even if domain matches
+# exclude = [
+#     "noreply@yourcompany.com",
+# ]
+
+# Optional: also apply title filters (same as --topic / --exclude)
+# [title]
+# include = ["Strategy", "Alliances"]
+# exclude = ["Interview"]

@@ -1,0 +1,38 @@
+[project]
+name = "fathom-to-llmwiki"
+version = "0.1.0"
+description = "Export Fathom meeting transcripts as markdown for LLM Wiki"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+
+[project.urls]
+Homepage = "https://github.com/gauthiergarnier/fathom-to-llmwiki"
+Repository = "https://github.com/gauthiergarnier/fathom-to-llmwiki"
+dependencies = [
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "click>=8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-httpx>=0.35",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+fathom-export = "fathom_export.cli:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"

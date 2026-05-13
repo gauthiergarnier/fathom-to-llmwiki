@@ -1,312 +1,238 @@
-# Fathom to LLM Wiki
+# Meeting Export
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](https://opensource.org/licenses/Apache-2.0)
 
-Export [Fathom](https://fathom.video) meeting transcripts as structured Markdown files and feed them into an [LLM Wiki](https://github.com/gauthiergarnier/llmwiki-sqlite-vec) knowledge base.
+Export meeting transcripts from **Fathom** and **Google Meet** as structured Markdown files for an [LLM Wiki](https://github.com/gauthiergarnier/llmwiki-sqlite-vec) knowledge base.
 
-Meetings turn into searchable, interlinked documents that Claude can read, cite, and build on — without copy-pasting transcripts or losing context between conversations.
+Meetings become searchable, interlinked documents that Claude can read, cite, and build on — without copy-pasting transcripts or losing context between conversations.
 
-## Why this exists
+## How it works
 
-Fathom records your meetings and generates AI summaries and transcripts. LLM Wiki turns a folder of documents into a structured, searchable knowledge base that Claude can work with via MCP. This tool bridges the two: it pulls your meetings from the Fathom API, converts them to well-structured Markdown files with YAML frontmatter, and drops them into your LLM Wiki workspace where they get indexed automatically.
+```
+meeting-export fathom sync    →  Fathom API  →  Markdown + YAML frontmatter
+meeting-export gmeet sync     →  Calendar + Drive APIs  →  Markdown + YAML frontmatter
+                                                              ↓
+                                                    Obsidian / LLM Wiki vault
+```
 
-The result: every meeting you record becomes part of your knowledge base. Claude can search across them, cross-reference decisions with earlier conversations, and cite specific moments when writing wiki pages.
+**Fathom** — pulls meetings from the Fathom API with AI summaries, action items, and full transcripts. Summary timestamps are rewritten to Obsidian block references for click-to-jump navigation.
 
-## What it does
+**Google Meet** — reads your Google Calendar for events with Meet links, then retrieves the associated notes directly from event attachments:
+- **Gemini Notes** — AI-generated summaries with structured sections (Summary, Decisions, Next Steps, Details)
+- **Manual Notes** — rolling Google Docs with date-headed sections; only the section matching the event date is extracted
+- Events without notes or recordings are skipped
 
-1. **Fetches meetings** from the Fathom API — summaries, action items, transcripts, and metadata (participants, dates, duration).
-2. **Converts to Markdown** — each meeting becomes a `.md` file with YAML frontmatter, an AI summary with internal links, action item checklists, and the full transcript.
-3. **Links summary to transcript** — timestamps in the Fathom summary are rewritten to Obsidian block references (`^t-169`), so clicking a summary bullet jumps to the exact moment in the transcript.
-4. **Tracks sync state** — a local JSON file records which meetings have been exported, so re-running the command only fetches new ones.
-5. **Integrates with LLM Wiki** — files are written to your workspace directory. If the LLM Wiki server is running, the file watcher auto-indexes them. Otherwise, run `llmwiki reindex`.
+Both connectors track sync state in a JSON file, so re-running only fetches new meetings.
+
+## Quick start
+
+**Requirements:** Python 3.11+
+
+```bash
+git clone https://github.com/gauthiergarnier/meeting-export.git
+cd meeting-export
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+
+cp .env.example .env
+# Edit .env — set at minimum FATHOM_API_KEY or Google OAuth credentials
+```
+
+### Google Meet setup
+
+1. Create an OAuth 2.0 Desktop App in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Enable **Google Calendar API** and **Google Drive API**
+3. Add scopes: `calendar.readonly`, `drive.readonly`
+4. Download the client secret JSON to `credentials/client_secret.json`
+5. Run the auth flow:
+
+```bash
+meeting-export gmeet auth
+```
+
+## Usage
+
+### Fathom
+
+```bash
+# Sync new meetings (incremental)
+meeting-export fathom sync
+
+# Backfill from a date in batches
+meeting-export fathom sync --since 2025-01-01 --batch 25
+
+# Filter by profile
+meeting-export fathom sync --profile profiles/customers.toml --batch 25
+
+# Ad-hoc filters
+meeting-export fathom sync --recorded-by alice@example.com --topic "Strategy"
+
+# List available meetings
+meeting-export fathom list --since 2026-01-01
+
+# Export a single meeting by ID
+meeting-export fathom export 145162043
+
+# Check sync state / reset
+meeting-export fathom status
+meeting-export fathom reset
+```
+
+### Google Meet
+
+```bash
+# Authenticate (first time only)
+meeting-export gmeet auth
+
+# Sync today's meetings
+meeting-export gmeet sync --since 2026-05-13 --until 2026-05-14
+
+# Sync last 6 months (default if no --since)
+meeting-export gmeet sync
+
+# Preview without writing files
+meeting-export gmeet sync --dry-run
+
+# List calendar events with Meet links
+meeting-export gmeet list --since 2026-05-01
+
+# Check sync state / reset
+meeting-export gmeet status
+meeting-export gmeet reset
+```
+
+### Common flags
+
+| Flag | Description |
+|------|-------------|
+| `-v` / `--verbose` | Debug-level logging (place before subcommand) |
+| `--since YYYY-MM-DD` | Export meetings after this date |
+| `--until YYYY-MM-DD` | Export meetings before this date |
+| `--force` | Re-export already exported meetings |
+| `--dry-run` | Preview without writing files or updating state |
+| `--limit N` | Max meetings to export |
+
+Fathom-specific: `--profile`, `--recorded-by`, `--topic`, `--exclude`, `--batch N`
 
 ## Output format
 
-Each meeting produces a file like `2026-05-11 - Weekly Strategy Review.md`:
+Each meeting produces a file like `2026-05-13 - Weekly Strategy Review.md`:
 
 ```markdown
 ---
 title: "Weekly Strategy Review"
-date: 2026-05-11
-type: fathom-transcript
-source: fathom
-recording_url: "https://fathom.video/calls/123456"
+date: 2026-05-13
+type: gmeet-transcript
+source: google-meet
+meet_link: "https://meet.google.com/abc-defg-hij"
 tags:
-  - fathom-transcript
+  - gmeet-transcript
   - meeting
 participants:
   - "Alice Martin <alice@example.com>"
   - "Bob Chen <bob@partner.com>"
-recorded_by: "Jane Smith"
+organizer: "alice@example.com"
 duration: "45 min"
 ---
 
 # Weekly Strategy Review
 
-**Date:** May 11, 2026
+**Date:** May 13, 2026
 **Duration:** 45 min
 **Participants:** Alice Martin, Bob Chen
-**Recorded by:** Jane Smith
-**Recording:** [View on Fathom](https://fathom.video/calls/123456)
 
 ## Summary
 
-[Key decision about Q3 roadmap.](#^t-332)
-[Budget approved for the new initiative.](#^t-890)
+Discussion covered Q3 roadmap priorities and budget allocation.
 
-## Action Items
+## Decisions
 
-- [ ] Send updated timeline (Alice Martin)
-- [ ] Draft proposal outline (Bob Chen)
+- Budget approved for the new initiative.
 
-## Transcript
+## Next Steps
 
-**Alice Martin** (00:05:32)
-Let's revisit the budget allocations. ^t-332
-
-**Bob Chen** (00:14:50)
-I've updated the spreadsheet with the new figures. ^t-890
+- [Alice Martin] Send updated timeline by Friday.
+- [Bob Chen] Draft proposal outline.
 ```
 
-## Quick start
-
-**Requirements:** Python 3.11+, a [Fathom API key](https://fathom.video) (Settings > API Access)
-
-```bash
-git clone https://github.com/gauthiergarnier/fathom-to-llmwiki.git
-cd fathom-to-llmwiki
-
-# Create a virtual environment and install
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-
-# Configure your API key
-cp .env.example .env
-# Edit .env and set FATHOM_API_KEY=your_key_here
-```
-
-## Usage
-
-### Sync meetings
-
-Fetch new meetings from Fathom and export them as Markdown:
-
-```bash
-fathom-export sync
-```
-
-On the first run, this fetches meetings from the last 30 days. On subsequent runs, it picks up from where it left off.
-
-**Options:**
-
-| Flag | Description |
-|------|-------------|
-| `--since YYYY-MM-DD` | Export meetings after this date |
-| `--until YYYY-MM-DD` | Export meetings before this date |
-| `--profile PATH` | TOML profile for participant/title filtering (see [Profiles](#profiles)) |
-| `--recorded-by EMAIL` | Only export meetings recorded by this person (repeatable) |
-| `--topic KEYWORD` | Only export meetings whose title contains this keyword (repeatable) |
-| `--exclude KEYWORD` | Skip meetings whose title contains this keyword (repeatable) |
-| `--force` | Re-export already exported meetings |
-| `--dry-run` | Preview what would be exported without writing files |
-| `--limit N` | Max number of meetings to export per batch |
-| `--batch N` | Auto-loop in batches of N until all meetings are exported |
-
-**Examples:**
-
-```bash
-# Backfill all meetings from 2025 in batches of 25
-fathom-export sync --since 2025-01-01 --batch 25
-
-# Export only meetings with customers
-fathom-export sync --profile profiles/customers.toml --batch 25
-
-# Export only internal team meetings
-fathom-export sync --profile profiles/team.toml --since 2026-01-01
-
-# Preview what a profile would export
-fathom-export list --profile profiles/customers.toml
-
-# Combine profile with date range
-fathom-export sync --profile profiles/customers.toml --since 2026-01-01 --until 2026-03-31 --batch 25
-
-# Ad-hoc filters (without a profile)
-fathom-export sync --recorded-by alice@example.com --topic "Strategy"
-
-# Re-export everything (e.g., after a format change)
-fathom-export reset
-fathom-export sync --since 2025-01-01 --batch 25
-```
-
-### List meetings
-
-See what meetings are available in Fathom without exporting:
-
-```bash
-fathom-export list
-fathom-export list --since 2026-05-01
-```
-
-Meetings already exported are marked with `[exported]`.
-
-### Export a single meeting
-
-Export one specific meeting by its recording ID (shown by `list`):
-
-```bash
-fathom-export export 145162043
-```
-
-### Check sync status
-
-```bash
-fathom-export status
-```
-
-Shows the last sync time, number of exported meetings, and output directory.
-
-### Reset sync state
-
-```bash
-fathom-export reset
-```
-
-Clears the sync state file so all meetings can be re-exported. Does not delete any exported files.
-
-### Verbose mode
-
-Add `-v` before any command for debug-level logging:
-
-```bash
-fathom-export -v sync --limit 3
-```
+Fathom exports include additional sections: **Action Items** (checkbox list with assignees) and **Transcript** (full text with speaker names, timestamps, and Obsidian block anchors).
 
 ## Configuration
 
-All configuration is via environment variables, loaded from a `.env` file in the project directory.
+All configuration is via environment variables, loaded from `.env`.
+
+### Shared
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OUTPUT_DIR` | *(home directory)* | Root of your LLM Wiki workspace |
+
+### Fathom
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `FATHOM_API_KEY` | *(required)* | Your Fathom API key |
 | `FATHOM_BASE_URL` | `https://api.fathom.ai/external/v1` | API base URL |
-| `OUTPUT_DIR` | *(your home directory)* | Root of your LLM Wiki workspace |
-| `OUTPUT_SUBDIR` | `Fathom Transcripts` | Subdirectory for exported files |
-| `STATE_FILE` | `.fathom-export-state.json` | Path to the sync state file |
-| `RATE_LIMIT_PER_MINUTE` | `50` | Max API requests per minute (Fathom allows 60) |
-| `RECORDED_BY` | *(none)* | Comma-separated emails to filter by recorder |
-| `TITLE_FILTER` | *(none)* | Comma-separated keywords — only export matching titles |
-| `TITLE_EXCLUDE` | *(none)* | Comma-separated keywords — skip matching titles |
+| `FATHOM_OUTPUT_SUBDIR` | `Fathom Transcripts` | Subdirectory for Fathom exports |
+| `FATHOM_STATE_FILE` | `.fathom-export-state.json` | Sync state file |
+| `RATE_LIMIT_PER_MINUTE` | `50` | Max API requests per minute |
 
-Filters set in `.env` act as defaults. CLI flags (`--recorded-by`, `--topic`, `--exclude`) override them when provided.
+### Google Meet
 
-## Profiles
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GOOGLE_CLIENT_SECRET` | `credentials/client_secret.json` | OAuth client secret path |
+| `GOOGLE_TOKEN_PATH` | `~/.gmeet-to-llmwiki/token.json` | OAuth token storage |
+| `GMEET_OUTPUT_SUBDIR` | `Google Meet Transcripts` | Subdirectory for GMeet exports |
+| `GMEET_STATE_FILE` | `.gmeet-export-state.json` | Sync state file |
 
-For recurring exports, create TOML profile files instead of passing filters every time. A profile defines which meetings to export based on **participants** (by email, name, or company domain) and optionally **title keywords**.
+## Profiles (Fathom)
 
-```bash
-fathom-export sync --profile profiles/team.toml --batch 25
-fathom-export sync --profile profiles/customers.toml --since 2025-01-01 --batch 25
-```
-
-### Profile format
+TOML files for recurring export filters based on participants and title keywords:
 
 ```toml
 # profiles/customers.toml
 [participants]
-include = [
-    "*@customer-one.com",    # domain wildcard — any email at this domain
-    "*@partner-corp.io",     # another company domain
-    "jane.doe@external.com", # specific email address
-    "Alice Martin",          # name substring match
-]
-exclude = [
-    "noreply@customer-one.com",  # skip automated invites
-]
+include = ["*@customer.com", "jane.doe@partner.io"]
+exclude = ["noreply@customer.com"]
 
 [title]
-include = ["Strategy", "Review"]   # optional: only matching titles
-exclude = ["Interview", "1:1"]     # optional: skip matching titles
+include = ["Strategy", "Review"]
+exclude = ["Interview"]
 ```
-
-### Matching rules
-
-- **`*@domain.com`** — matches any email at that domain (most common pattern)
-- **`user@domain.com`** — exact email match
-- **`Name`** — substring match against participant names (case-insensitive)
-- A meeting matches if **any** participant matches an `include` pattern and **none** of the matching participants are in `exclude`
-- When all include patterns are domain wildcards (`*@...`), the domains are also sent to the Fathom API for server-side pre-filtering
-
-### Example profiles
-
-Two example profiles are provided in `profiles/`:
-
-- **[`team.example.toml`](profiles/team.example.toml)** — internal team meetings (filter by your company domains)
-- **[`customers.example.toml`](profiles/customers.example.toml)** — customer and partner meetings (filter by external domains)
-
-Copy and customize them:
 
 ```bash
-cp profiles/team.example.toml profiles/team.toml
-cp profiles/customers.example.toml profiles/customers.toml
-# Edit with your actual domains and contacts
+meeting-export fathom sync --profile profiles/customers.toml --batch 25
 ```
 
-The `list` command also accepts `--profile` to preview what a profile would match:
+Matching rules:
+- `*@domain.com` — any email at that domain
+- `user@domain.com` — exact email match
+- `Name` — substring match against participant names (case-insensitive)
 
-```bash
-fathom-export list --profile profiles/customers.toml --since 2026-01-01
-```
+Example profiles in `profiles/*.example.toml`.
 
 ## Integration with LLM Wiki
 
-This tool is designed as a companion to [llmwiki-sqlite-vec](https://github.com/gauthiergarnier/llmwiki-sqlite-vec). Set `OUTPUT_DIR` to your LLM Wiki workspace directory and exported transcripts become searchable sources.
+Set `OUTPUT_DIR` to your LLM Wiki workspace. Exported files are auto-indexed by the file watcher if the server is running, or reindex manually with `llmwiki reindex`.
 
-**If the LLM Wiki server is running** (`llmwiki serve`), the file watcher auto-detects new `.md` files and indexes them into the SQLite database (FTS5 full-text + vector embeddings).
+Files are standard Markdown with YAML frontmatter and work in [Obsidian](https://obsidian.md) out of the box.
 
-**If the server is not running**, reindex after export:
-
-```bash
-llmwiki reindex /path/to/your/workspace
-```
-
-Once indexed, Claude can search across your meeting transcripts via MCP, cite specific moments in wiki pages, and cross-reference decisions across meetings.
-
-### Obsidian compatibility
-
-Exported files are standard Markdown with YAML frontmatter and work in [Obsidian](https://obsidian.md) out of the box. Summary links use Obsidian block references (`[text](#^t-332)` pointing to `^t-332` in the transcript), so clicking a summary point scrolls to the relevant transcript moment.
-
-### Automation with cron
-
-For daily automatic sync, add a cron job:
-
-```bash
-crontab -e
-```
+### Automation
 
 ```cron
-0 7 * * * cd /path/to/fathom-to-llmwiki && /path/to/.venv/bin/fathom-export sync >> /tmp/fathom-export.log 2>&1
+# Daily sync at 7am
+0 7 * * * cd /path/to/meeting-export && .venv/bin/meeting-export fathom sync >> /tmp/meeting-export.log 2>&1
+0 7 * * * cd /path/to/meeting-export && .venv/bin/meeting-export gmeet sync >> /tmp/meeting-export.log 2>&1
 ```
-
-## How it works
-
-The sync runs in two phases to minimize API usage:
-
-1. **Discovery** — calls `GET /meetings` with summary and action items included (small payloads), paginates through results, and filters out already-exported meetings.
-2. **Export** — for each new meeting, fetches the full transcript via `GET /recordings/{id}/transcript`, converts everything to Markdown, and writes the file atomically (temp file + rename, safe for iCloud/Dropbox sync).
-
-The Fathom API has a global rate limit of 60 requests per 60 seconds. The client tracks request timestamps and sleeps proactively to stay under the configured limit (default: 50/min). On HTTP 429, it reads the `RateLimit-Reset` header and backs off automatically.
 
 ## Development
 
 ```bash
-# Install with dev dependencies
 pip install -e ".[dev]"
-
-# Run tests
 pytest
-
-# Lint
 ruff check src/ tests/
 ```
 

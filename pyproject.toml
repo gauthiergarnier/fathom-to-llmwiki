@@ -16,6 +16,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/gauthiergarnier/meeting-export"
 Repository = "https://github.com/gauthiergarnier/meeting-export"
+Documentation = "https://github.com/gauthiergarnier/meeting-export/tree/main/docs/specs/meeting-export"
 
 [project.optional-dependencies]
 dev = [

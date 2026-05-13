@@ -35,9 +35,9 @@ class Config:
             kwargs["base_url"] = v
         if v := os.environ.get("OUTPUT_DIR"):
             kwargs["output_dir"] = Path(v)
-        if v := os.environ.get("OUTPUT_SUBDIR"):
+        if v := os.environ.get("FATHOM_OUTPUT_SUBDIR"):
             kwargs["output_subdir"] = v
-        if v := os.environ.get("STATE_FILE"):
+        if v := os.environ.get("FATHOM_STATE_FILE"):
             kwargs["state_file"] = Path(v)
         if v := os.environ.get("RATE_LIMIT_PER_MINUTE"):
             kwargs["rate_limit_per_minute"] = int(v)

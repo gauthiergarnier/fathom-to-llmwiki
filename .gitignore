@@ -1,5 +1,7 @@
 .env
 .fathom-export-state.json
+.gmeet-export-state.json
+credentials/client_secret.json
 profiles/*.toml
 !profiles/*.example.toml
 __pycache__/

@@ -34,8 +34,6 @@ class FathomClient:
     def __exit__(self, *exc) -> None:
         self.close()
 
-    # -- rate limiting --
-
     def _wait_for_rate_limit(self) -> None:
         now = time.monotonic()
         window = 60.0
@@ -46,8 +44,6 @@ class FathomClient:
             log.debug("Rate limit: sleeping %.1fs", sleep_for)
             time.sleep(sleep_for)
         self._request_times.append(time.monotonic())
-
-    # -- HTTP with retry --
 
     def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
         for attempt in range(1, _MAX_RETRIES + 1):
@@ -79,8 +75,6 @@ class FathomClient:
             return resp
 
         raise RuntimeError("Exhausted retries")
-
-    # -- API methods --
 
     def list_meetings(
         self,

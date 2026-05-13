@@ -5,8 +5,8 @@ from pathlib import Path
 import httpx
 import pytest
 
-from fathom_export.client import FathomClient
-from fathom_export.config import Config
+from meeting_export.fathom.client import FathomClient
+from meeting_export.fathom.config import Config
 
 FIXTURE = Path(__file__).parent / "fixtures" / "meeting_response.json"
 

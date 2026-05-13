@@ -70,7 +70,6 @@ class Profile:
 
     @property
     def api_domains(self) -> list[str] | None:
-        """Extract pure domain filters that can be passed to the Fathom API."""
         domains = []
         for p in self.participant_include:
             if p.startswith("*@") and "*" not in p[2:] and "?" not in p[2:]:

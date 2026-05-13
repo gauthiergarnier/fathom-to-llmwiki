@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import logging
-import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from ..shared.io import atomic_write, resolve_collision
+from ..shared.state import SyncState
 from .client import FathomClient
 from .config import Config
-from .converter import make_filename, meeting_to_markdown
+from .converter import fathom_make_filename, meeting_to_markdown
 from .profile import Profile
-from .state import SyncState
 
 log = logging.getLogger(__name__)
 
@@ -41,18 +41,15 @@ def run_sync(
     if until and until.tzinfo is None:
         until = until.replace(tzinfo=timezone.utc)
 
-    # Merge CLI filters with config defaults
     effective_recorded_by = recorded_by or config.recorded_by or None
     effective_title_filter = title_filter or config.title_filter or None
     effective_title_exclude = title_exclude or config.title_exclude or None
 
-    # API-side domain optimization from profile
     api_domains = profile.api_domains if profile else None
 
     config.transcript_dir.mkdir(parents=True, exist_ok=True)
 
     with FathomClient(config) as client:
-        # Phase 1: list meetings with summary/actions (small), but no transcript (large)
         log.info("Fetching meeting list...")
         candidates: list[dict] = []
         for meeting in client.list_meetings(
@@ -88,7 +85,6 @@ def run_sync(
 
         log.info("Found %d new meeting(s) to export", len(candidates))
 
-        # Phase 2: fetch transcript for each candidate
         for meeting in candidates:
             recording_id = meeting.get("recording_id", "")
             title = meeting.get("title") or "Untitled Meeting"
@@ -108,9 +104,9 @@ def run_sync(
 
             meeting["transcript"] = transcript
 
-            filename = make_filename(meeting)
+            filename = fathom_make_filename(meeting)
             filepath = config.transcript_dir / filename
-            filepath = _resolve_collision(filepath)
+            filepath = resolve_collision(filepath)
             rel_path = f"{config.output_subdir}/{filepath.name}"
 
             if not force and filepath.exists():
@@ -126,7 +122,7 @@ def run_sync(
                 result.exported += 1
                 continue
 
-            _atomic_write(filepath, markdown)
+            atomic_write(filepath, markdown)
             state.mark_exported(recording_id, title, rel_path)
             state.save()
             log.info("Exported: %s -> %s", title, filepath.name)
@@ -157,11 +153,11 @@ def export_single(config: Config, recording_id: int) -> Path:
                 meeting.update({k: v for k, v in m.items() if k not in ("transcript", "default_summary")})
                 break
 
-        filename = make_filename(meeting)
+        filename = fathom_make_filename(meeting)
         filepath = config.transcript_dir / filename
-        filepath = _resolve_collision(filepath)
+        filepath = resolve_collision(filepath)
         markdown = meeting_to_markdown(meeting)
-        _atomic_write(filepath, markdown)
+        atomic_write(filepath, markdown)
 
         state = SyncState(config.state_file)
         title = meeting.get("title", "")
@@ -169,37 +165,6 @@ def export_single(config: Config, recording_id: int) -> Path:
         state.save()
 
         return filepath
-
-
-def _resolve_collision(path: Path) -> Path:
-    if not path.exists():
-        return path
-    stem = path.stem
-    suffix = path.suffix
-    parent = path.parent
-    counter = 2
-    while True:
-        candidate = parent / f"{stem} ({counter}){suffix}"
-        if not candidate.exists():
-            return candidate
-        counter += 1
-
-
-def _atomic_write(path: Path, content: str) -> None:
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        dir=path.parent,
-        suffix=".tmp",
-        delete=False,
-    )
-    try:
-        tmp.write(content)
-        tmp.close()
-        Path(tmp.name).rename(path)
-    except BaseException:
-        Path(tmp.name).unlink(missing_ok=True)
-        raise
 
 
 def _title_matches(

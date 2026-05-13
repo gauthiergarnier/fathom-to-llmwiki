@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fathom_export.state import SyncState
+from meeting_export.shared.state import SyncState
 
 
 def test_fresh_state(tmp_path: Path):

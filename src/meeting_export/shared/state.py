@@ -29,15 +29,17 @@ class SyncState:
         self._data["last_sync_at"] = datetime.now(timezone.utc).isoformat()
         self._path.write_text(json.dumps(self._data, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    def is_exported(self, recording_id: str | int) -> bool:
-        return str(recording_id) in self._data.get("exported", {})
+    def is_exported(self, key: str | int) -> bool:
+        return str(key) in self._data.get("exported", {})
 
-    def mark_exported(self, recording_id: str | int, title: str, file_path: str) -> None:
-        self._data.setdefault("exported", {})[str(recording_id)] = {
+    def mark_exported(self, key: str | int, title: str, file_path: str, **extra: str) -> None:
+        entry: dict = {
             "title": title,
             "exported_at": datetime.now(timezone.utc).isoformat(),
             "file_path": file_path,
         }
+        entry.update(extra)
+        self._data.setdefault("exported", {})[str(key)] = entry
 
     @property
     def last_sync_at(self) -> datetime | None:

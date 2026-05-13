@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fathom_export.profile import Profile
+from meeting_export.fathom.profile import Profile
 
 
 def _write_profile(tmp_path: Path, content: str) -> Path:

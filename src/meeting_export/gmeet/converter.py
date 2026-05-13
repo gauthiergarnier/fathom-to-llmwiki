@@ -76,24 +76,17 @@ def meeting_to_markdown(match: dict) -> str:
     lines.extend(f"{p}  " for p in header_parts)
     lines.append("")
 
-    if notes_text:
-        lines.append("## Summary")
-        lines.append("")
-        lines.append(notes_text.strip())
-        lines.append("")
+    is_gemini = match.get("is_gemini", _is_gemini_notes(transcript_text))
 
-    if segments:
-        lines.append("## Transcript")
+    if is_gemini:
+        cleaned = _clean_gemini_notes(transcript_text)
+        lines.append(cleaned)
         lines.append("")
-        for seg in segments:
-            ts_part = f" ({seg['timestamp']})" if seg["timestamp"] else ""
-            lines.append(f"**{seg['speaker']}**{ts_part}  ")
-            lines.append(seg["text"])
-            lines.append("")
     elif transcript_text.strip():
-        lines.append("## Transcript")
+        cleaned = _clean_manual_notes(transcript_text)
+        lines.append("## Notes")
         lines.append("")
-        lines.append(transcript_text.strip())
+        lines.append(cleaned)
         lines.append("")
 
     return "\n".join(lines)
@@ -156,6 +149,82 @@ def gmeet_make_filename(event: dict) -> str:
     date_obj = parse_dt(event.get("start", ""))
     date_str = date_obj.strftime("%Y-%m-%d") if date_obj else ""
     return make_filename(title, date_str)
+
+
+def _clean_manual_notes(text: str) -> str:
+    lines = text.replace("\r\n", "\n").strip().split("\n")
+    out: list[str] = []
+    skip_first_header = True
+    for line in lines:
+        stripped = line.strip()
+        if skip_first_header and re.match(r"^[A-Z][a-z]+ \d{1,2}, \d{4}\s*\|", stripped):
+            skip_first_header = False
+            continue
+        if stripped.startswith("Attendees:"):
+            continue
+        if re.match(r"^__{5,}$", stripped):
+            continue
+        if stripped in ("Notes", "Action items"):
+            out.append("")
+            out.append(f"### {stripped}")
+            out.append("")
+            continue
+        if stripped.startswith("* "):
+            out.append(f"- {stripped[2:]}")
+            continue
+        out.append(line.rstrip())
+    return "\n".join(out).strip()
+
+
+def _is_gemini_notes(text: str) -> bool:
+    if not text:
+        return False
+    normalized = text.replace("\r\n", "\n")
+    return "📝 Notes" in normalized or "\nSummary\n" in normalized
+
+
+def _clean_gemini_notes(text: str) -> str:
+    lines = text.replace("\r\n", "\n").strip().split("\n")
+    out: list[str] = []
+    past_header = False
+    for line in lines:
+        stripped = line.strip()
+        if not past_header:
+            if _gemini_section_heading(stripped):
+                past_header = True
+            else:
+                continue
+        if stripped.startswith("Rate this Summary:") or stripped.startswith("Did the screenshots"):
+            continue
+        if stripped.startswith("We've updated the") and "section using your feedback" in stripped:
+            continue
+        if stripped.startswith("Let us know what you think:"):
+            continue
+        if stripped in ("Helpful or Not Helpful",):
+            continue
+        heading = _gemini_section_heading(stripped)
+        if heading:
+            out.append("")
+            out.append(f"## {heading}")
+            out.append("")
+            continue
+        if stripped.startswith("* "):
+            out.append(f"- {stripped[2:]}")
+            continue
+        out.append(line.rstrip())
+    return "\n".join(out).strip()
+
+
+_GEMINI_HEADINGS = {
+    "Summary": "Summary",
+    "Decisions": "Decisions",
+    "Next steps": "Next Steps",
+    "Details": "Details",
+}
+
+
+def _gemini_section_heading(line: str) -> str | None:
+    return _GEMINI_HEADINGS.get(line.strip())
 
 
 def _is_speaker_line(line: str) -> bool:

@@ -32,12 +32,26 @@ def list_meet_events(
 
         response = service.events().list(**kwargs).execute()
 
+        log.debug("API returned %d events", len(response.get("items", [])))
         for event in response.get("items", []):
+            log.debug(
+                "Event: %s | start=%s | conf=%s",
+                event.get("summary", "?"),
+                event.get("start", {}).get("dateTime", event.get("start", {}).get("date", "?")),
+                bool(event.get("conferenceData")),
+            )
             conf = event.get("conferenceData")
             if not conf:
+                log.debug("No conferenceData: %s", event.get("summary", "?"))
                 continue
             solution = conf.get("conferenceSolution", {})
-            if solution.get("name") != "Google Meet":
+            sol_name = solution.get("name", "")
+            if sol_name != "Google Meet":
+                log.debug(
+                    "Skipped (solution=%r): %s",
+                    sol_name,
+                    event.get("summary", "?"),
+                )
                 continue
 
             yield _extract_event(event)
@@ -69,6 +83,25 @@ def _extract_event(event: dict) -> dict:
 
     organizer = event.get("organizer", {})
 
+    notes_attachment = None
+    recording_attachment = None
+    for att in event.get("attachments", []):
+        mime = att.get("mimeType", "")
+        title = att.get("title", "")
+        if mime == "application/vnd.google-apps.document":
+            if notes_attachment is None or "Gemini" in title:
+                notes_attachment = {
+                    "file_id": att.get("fileId", ""),
+                    "title": title,
+                    "url": att.get("fileUrl", ""),
+                }
+        elif mime.startswith("video/"):
+            recording_attachment = {
+                "file_id": att.get("fileId", ""),
+                "title": title,
+                "url": att.get("fileUrl", ""),
+            }
+
     return {
         "event_id": event.get("id", ""),
         "title": event.get("summary", "Untitled Meeting"),
@@ -80,4 +113,6 @@ def _extract_event(event: dict) -> dict:
         "meet_link": meet_link,
         "conference_id": conf.get("conferenceId", ""),
         "calendar_link": event.get("htmlLink", ""),
+        "notes_attachment": notes_attachment,
+        "recording_attachment": recording_attachment,
     }

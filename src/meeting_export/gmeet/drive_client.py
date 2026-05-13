@@ -10,6 +10,9 @@ log = logging.getLogger(__name__)
 TRANSCRIPT_MIME = "application/vnd.google-apps.document"
 
 
+DOC_KEYWORDS = ["Notes by Gemini", "Transcript"]
+
+
 def find_transcript(
     service: Resource,
     event_title: str,
@@ -17,28 +20,30 @@ def find_transcript(
 ) -> dict | None:
     safe_title = _escape_query(event_title)
 
-    query = (
-        f"mimeType='{TRANSCRIPT_MIME}' "
-        f"and name contains 'Transcript' "
-        f"and name contains '{safe_title}' "
-        f"and trashed = false"
-    )
-    results = _search(service, query, max_results=5)
-    if results:
-        return _best_match(results, event_date)
+    for keyword in DOC_KEYWORDS:
+        query = (
+            f"mimeType='{TRANSCRIPT_MIME}' "
+            f"and name contains '{keyword}' "
+            f"and name contains '{safe_title}' "
+            f"and trashed = false"
+        )
+        results = _search(service, query, max_results=5)
+        if results:
+            return _best_match(results, event_date)
 
     day_start = event_date.strftime("%Y-%m-%dT00:00:00")
     day_end = (event_date + timedelta(days=1)).strftime("%Y-%m-%dT23:59:59")
-    query = (
-        f"mimeType='{TRANSCRIPT_MIME}' "
-        f"and name contains 'Transcript' "
-        f"and modifiedTime >= '{day_start}' "
-        f"and modifiedTime <= '{day_end}' "
-        f"and trashed = false"
-    )
-    results = _search(service, query, max_results=10)
-    if results:
-        return _best_match(results, event_date)
+    for keyword in DOC_KEYWORDS:
+        query = (
+            f"mimeType='{TRANSCRIPT_MIME}' "
+            f"and name contains '{keyword}' "
+            f"and modifiedTime >= '{day_start}' "
+            f"and modifiedTime <= '{day_end}' "
+            f"and trashed = false"
+        )
+        results = _search(service, query, max_results=10)
+        if results:
+            return _best_match(results, event_date)
 
     return None
 
@@ -49,15 +54,16 @@ def find_meeting_notes(
     event_date: datetime,
 ) -> dict | None:
     safe_title = _escape_query(event_title)
-    query = (
-        f"mimeType='{TRANSCRIPT_MIME}' "
-        f"and name contains 'Notes' "
-        f"and name contains '{safe_title}' "
-        f"and trashed = false"
-    )
-    results = _search(service, query, max_results=5)
-    if results:
-        return _best_match(results, event_date)
+    for keyword in ["Notes", "Summary"]:
+        query = (
+            f"mimeType='{TRANSCRIPT_MIME}' "
+            f"and name contains '{keyword}' "
+            f"and name contains '{safe_title}' "
+            f"and trashed = false"
+        )
+        results = _search(service, query, max_results=5)
+        if results:
+            return _best_match(results, event_date)
     return None
 
 
